@@ -3,10 +3,10 @@ Update submissions from OJs onto Trello
 
 ## Components
 ### OJ Scraper
-+ Keys: [REST](http://rest.elkstein.org/), HTML, Python data structure, Install Python packages
++ Keys: [REST](http://rest.elkstein.org/), HTML, Beautiful Soup, Python data structure, Install Python packages
 + Download the most recent and accepted submissions from an online judge website
   + For LeetCode, the website to scrap is https://leetcode.com/submissions/1 (you need to login first)
-+ Parse the HTML or any downloaded data into native Python data structures
++ Parse the HTML or any downloaded data into native Python data structures using Beautiful Soup
 + Optimize: ask the database manager for the latest scraped submission and make requests only if necessary
 + Requests is a wonderful library
 + There are a bunch of leetcode scraper right on Github
