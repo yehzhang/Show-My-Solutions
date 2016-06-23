@@ -90,3 +90,7 @@ ENV/
 
 *.db
 *.ini
+
+*.sublime-project
+
+*.sublime-workspace
