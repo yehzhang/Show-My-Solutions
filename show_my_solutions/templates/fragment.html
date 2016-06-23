@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block js %}
+    function sendFragment() {
+        var href = window.location.href;
+        var hash = window.location.hash;
+        href = href.substr(0, href.length - hash.length);
+        var n = href.indexOf('?');
+        href = href.substring(0, n != -1 ? n : href.length);
+        if (href.slice(-1) != '/')
+            href += '/';
+
+        var path;
+        if (hash) {
+            hash = hash.substr(1);
+            hash = hash.split('=').pop()
+            path = 'fragment' + '/' +  hash;
+        }
+        else
+            path = 'shutdown'
+        
+        window.location.href = href + path;
+    }
+    window.onload = sendFragment;
+{% endblock %}
