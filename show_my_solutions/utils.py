@@ -1,0 +1,57 @@
+import logging
+import requests
+from bs4 import BeautifulSoup
+from . import __title__ as title, __version__ as version
+
+LOGGER = logging.getLogger(__name__)
+
+
+class WebsiteSession(requests.Session):
+
+    def __init__(self, host, auth=None, login=None):
+        """
+        :param host: protocal and domain to prepend in all requests
+        :param auth: same as the one in requests.Session
+        :param login: called when authentication failed
+        """
+        super().__init__()
+        self.host = host
+        if auth:
+            self.auth = auth
+        self.headers.update({
+            'Referer': host,
+            'User-Agent': '{} {}'.format(title, version),
+        })
+        self.login = login
+
+    def __del__(self):
+        self.close()
+
+    def __call__(self, path):
+        return self.prepend_host(path)
+
+    def request(self, method, url, *args, **kwargs):
+        url = self.prepend_host(url)
+        r = super().request(method, url, *args, **kwargs)
+
+        LOGGER.debug('Query url: %s with method %s, recieving status code %s',
+                     r.url, method, r.status_code)
+        if r.status_code == 401:
+            if not kwargs.get('retry', False) and self.login:
+                if self.login():
+                    return self.request(method, url, *args, **kwargs, retry=True)
+            raise RuntimeError('Cannot authenticate')
+        if r.status_code >= 400:
+            raise RuntimeError('Exception occured: {}'.format(r.text))
+
+        return r
+
+    def soup(self, *args, **kwargs):
+        r = self.get(*args, **kwargs)
+        return BeautifulSoup(r.text, 'html.parser')
+
+    def json(self, *args, **kwargs):
+        return self.get(*args, **kwargs).json()
+
+    def prepend_host(self, path):
+        return '/'.join([self.host, path.lstrip('/')])
