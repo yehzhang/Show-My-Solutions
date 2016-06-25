@@ -1,6 +1,4 @@
 import logging
-import socket
-from threading import Timer, Thread
 from urllib.parse import urlencode
 from webbrowser import open_new
 from requests.auth import AuthBase
@@ -24,7 +22,7 @@ class TrelloAuth(AuthBase):
         self.handler = handler
         self.address = (self.ip, self.port)
         self.port += 1
-        self.key, self.token = map(handler.config.get, ('app_key', 'user_token'))
+        self.key, self.token = map(handler.options.get, ('app_key', 'user_token'))
         if self.token is None:
             self.token = fetch_user_token(handler.name)
             if self.token is None:
@@ -43,12 +41,11 @@ class TrelloAuth(AuthBase):
         LOGGER.info('Press Ctrl+C to quit in case of frozen')
         auth_url = gen_url_query('https://trello.com/1/authorize',
                                  key=self.key,
-                                 expiration=self.handler.config['auth_expiration'],
+                                 expiration=self.handler.options['auth_expiration'],
                                  scope='read,write',
-                                 name=self.handler.settings['app_name'],
+                                 name=self.handler.reactor.options['app_name'],
                                  callback_method='fragment',
-                                 return_url='http://{}:{}'.format(*self.address)
-                                 )
+                                 return_url='http://{}:{}'.format(*self.address))
         open_new(auth_url)
         return self.listen_for_token()
 
@@ -83,7 +80,6 @@ class TrelloAuth(AuthBase):
 
         self.token = None
         app.run(*self.address)
-        LOGGER.debug('Listening stopped')
         if self.token is None:
             raise ValueError('Failed to fetch the access token')
         return self.token

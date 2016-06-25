@@ -1,52 +1,52 @@
 import logging
-import requests
-from .dbmanager import fetch_submissions, add_milestone
+from .dbmanager import add_milestone
 from .auth import TrelloAuth
-
+from .utils import WebsiteSession
 
 LOGGER = logging.getLogger(__name__)
 
 
-class _HandlerMeta(type):
+class HandlerMeta(type):
 
+    name = 'Handler'
     loaded = {}
-    handlers = {}
+    registered = {}
 
-    def __new__(cls, name, bases, nmspc):
-        cls = super().__new__(cls, name, bases, nmspc)
+    def __new__(mcs, name, bases, nmspc):
+        cls = super().__new__(mcs, name, bases, nmspc)
         cls_name = nmspc['name']
         if cls_name:
-            cls.handlers[cls_name] = cls
-            LOGGER.info('Register Handler: {}'.format(cls_name))
+            mcs.registered[cls_name] = cls
+            LOGGER.info('Register %s: %s', mcs.name, cls_name)
         return cls
 
     @classmethod
-    def get(cls, name, settings):
-        if name not in cls.loaded:
-            cls.loaded[name] = cls.handlers[name](settings)
-        return cls.loaded[name]
+    def get(mcs, name, reactor):
+        if name not in mcs.loaded:
+            mcs.loaded[name] = mcs.registered[name](reactor)
+        return mcs.loaded[name]
 
-build_handler = _HandlerMeta.get
+build_handler = HandlerMeta.get
 
 
-class BaseHandler(metaclass=_HandlerMeta):
+class BaseHandler(metaclass=HandlerMeta):
 
     name = None
     defaults = {}
 
-    def __init__(self, settings):
-        self.settings = settings
-        self.config = dict(self.defaults)
-        self.config.update(self.settings.get(self.name, {}))
-        self.init_handler()
-        LOGGER.debug("Handler '%s' has inited: %s", self.name, self.config)
+    def __init__(self, reactor):
+        self.reactor = reactor
+        self.options = dict(self.defaults)
+        self.options.update(self.reactor.options.get(self.name, {}))
+        self.init()
+        LOGGER.debug("%s '%s' has inited: %s", type(self).name, self.name, self.options)
 
-    def init_handler(self):
+    def init(self):
         """Init configuration here."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def upload(self, submissions):
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class TrelloHandler(BaseHandler):
@@ -54,80 +54,68 @@ class TrelloHandler(BaseHandler):
     name = 'trello'
     defaults = {
         'app_key': '7a0445134100faef2f5bbbc4437a42e6',
-        'submit_time_format': '%b %d %H:%M %Z',
+        # Do not display hour and minute because some OJs do not provide that
+        'submit_time_format': '%b %d',
         'user_token': None,
         'auth_expiration': '30days',
-        # TODO Warn user about duplication, first come first chosen
         'target_board_name': None,
         'target_list_name': None,
     }
+    API_URL = 'https://api.trello.com/1'
 
-    def init_handler(self):
-        if not all(k in self.config for k in ('target_board_name', 'target_list_name')):
+    def init(self):
+        if not all(k in self.options for k in ('target_board_name', 'target_list_name')):
             raise AssertionError(
                 "'target_board_name' and 'target_list_name' should both be present")
         self.list_id = None
+        self.me_id = None
         self.labels = None
-        self.time_format = self.config['submit_time_format']
         self.auth = TrelloAuth(self)
 
     def upload(self, submissions):
         """
         :type submissions: [submission]
         """
+        done = 0
         try:
-            with requests.Session() as s:
-                s.auth = self.auth
-                self.session = s
-
+            with WebsiteSession(self.API_URL, self.auth, self.auth.init_user_token) as s:
                 if self.list_id is None:
-                    board_id = self.find_id_by_name('/member/me/boards',
-                                                    self.config['target_board_name'])
-                    labels = self.get('/boards/{}/labels', board_id, field='name')
+                    self.me_id = s.json('/member/me')['id']
+
+                    boards = s.json('/member/me/boards')
+                    board_id = self.find_id_by_name(boards, self.options['target_board_name'])
+
+                    NAME_ONLY = {'field': 'name'}
+                    labels = s.json('/boards/{}/labels'.format(board_id), params=NAME_ONLY)
                     self.labels = {d['name'].lower(): d['id'] for d in labels}
-                    self.list_id = self.find_id_by_name('/boards/{}/lists',
-                                                        self.config['target_list_name'],
-                                                        board_id)
+
+                    lists = s.json('/boards/{}/lists'.format(board_id), params=NAME_ONLY)
+                    self.list_id = self.find_id_by_name(lists, self.options['target_list_name'])
 
                 # TODO check duplications
                 for sub in submissions:
-                    print(sub.oj, self.labels[sub.oj])
-                    date = sub.submit_time.strftime(self.time_format)
-                    self.post('/cards',
-                              idList=self.list_id,
-                              name='{}. {}'.format(sub.problem_id, sub.problem_title),
-                              desc='{}\n-- Accepted on {}'.format(sub.problem_url, date),
-                              pos='top',
-                              due=None,
-                              idLabels=self.labels.get(sub.oj, ''))
+                    date = sub.submit_time.strftime(self.options['submit_time_format'])
+                    s.post('/cards', params={
+                        'idList': self.list_id,
+                        'name': '{}. {}'.format(sub.problem_id, sub.problem_title),
+                        'desc': '{}\n-- Accepted on {}'.format(sub.problem_url, date),
+                        'pos': 'top',
+                        'due': None,
+                        'idLabels': self.labels.get(sub.oj, ''),
+                        'idMembers': self.me_id,
+                    })
+                    done += 1
 
         except KeyError as e:
             raise ValueError('Target name not found on Trello: {}'.format(e)) from None
+        finally:
+            if done > 0:
+                add_milestone(self.name,
+                              submissions[done - 1].pid)
 
-    def find_id_by_name(self, path, name, *args, **kwargs):
-        items = self.get(path, *args, field='name', **kwargs)
+    @classmethod
+    def find_id_by_name(cls, items, name):
         for d in items:
             if d['name'] == name:
                 return d['id']
         raise KeyError(name)
-
-    def get(self, path, *args, **kwargs):
-        return self.request('GET', path, args, kwargs)
-
-    def post(self, path, *args, **kwargs):
-        self.request('POST', path, args, kwargs)
-
-    def request(self, method, path, args=[], params={}):
-        url = 'https://api.trello.com/1' + path.format(*args)
-        self.session.params.update(params)
-        r = self.session.request(method, url)
-
-        LOGGER.debug('Trello query url: %s, recieving %s and %s', r.url, r.status_code, r.text)
-        if r.status_code == 401:
-            self.auth.init_user_token()
-            return self.request(method, path, args, params)
-        if r.status_code >= 400:
-            raise RuntimeError('Exception occured when querying {}, recieving {} and {}'
-                               .format(r.url, r.status_code, r.text))
-
-        return r.json()
