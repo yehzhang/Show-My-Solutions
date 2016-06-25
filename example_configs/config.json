@@ -1,0 +1,15 @@
+{
+    "logging": "INFO",
+
+    "sources": ["leetcode"],
+    "leetcode": {
+        "username": null,
+        "password": null
+    },
+    
+    "handlers": ["trello"],
+    "trello": {
+        "target_board_name": null,
+        "target_list_name": null
+    }
+}

@@ -94,3 +94,5 @@ ENV/
 *.sublime-project
 
 *.sublime-workspace
+
+example_configs/my-config.json
