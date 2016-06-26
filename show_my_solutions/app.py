@@ -15,6 +15,7 @@ class Reactor:
 
     defaults = {
         'app_name': 'Show My Solutions',
+        'engine_params': {},
         'submit_time_format': '%b %d %H:%M %Z',
         'path': '..',
         'logging': 'INFO',
@@ -28,7 +29,10 @@ class Reactor:
 
         path = os.path.abspath(self.options['path'])
         level = config_logging(path, self.options['logging'])
-        start_database(path=path, echo=level == logging.DEBUG)
+        engine_params = self.options['engine_params']
+        engine_params.setdefault('path', path)
+        engine_params.setdefault('echo', level == logging.DEBUG)
+        start_database(**engine_params)
 
         self.handlers = [build_handler(s, self) for s in self.options['handlers']]
         self.sources = [build_scraper(s, self) for s in self.options['sources']]
@@ -37,13 +41,18 @@ class Reactor:
 
     def start(self):
         for s in self.sources:
-            record_submissions(s.fetch())
+            subs = s.fetch()
+            LOGGER.debug('Fetched submissions: %s', subs)
+            LOGGER.info('Fetched %s submission(s) from %s', len(subs), s.name)
+            record_submissions(subs)
         LOGGER.info('All submissions are fetched')
 
         for h in self.handlers:
             subs = fetch_submissions(h.name)
             if subs:
+                LOGGER.debug('Uploading submissions: %s', subs)
                 h.upload(subs)
+                LOGGER.info('Uploaded %s submission(s) to %s', len(subs), h.name)
         LOGGER.info('All submissions are uploaded')
 
 

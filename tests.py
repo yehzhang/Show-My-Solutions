@@ -14,7 +14,7 @@ LOGGER = logging.getLogger(__name__)
 
 def setup_module(module):
     from show_my_solutions.dbmanager import start_database
-    start_database('sms_test.db', echo=False)
+    start_database(name='sms_test.db', echo=False)
 
 
 def gen_sub(oj, problem_id, seconddelta=None):

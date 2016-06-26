@@ -121,10 +121,13 @@ t_login = Table('login', meta,
                 Column('last_modified', DateTime, default=func.now(), nullable=False))
 
 
-def start_database(name='sms.db', path='.', *args, **kwargs):
+def start_database(**kwargs):
     global engine
+    print(kwargs)
+    name = kwargs.pop('name', 'sms.db')
+    path = kwargs.pop('path', '.')
     url = 'sqlite:///' + os.path.join(path, name)
-    engine = create_engine(url, *args, **kwargs)
+    engine = create_engine(url, **kwargs)
     meta.create_all(engine)
 
 
