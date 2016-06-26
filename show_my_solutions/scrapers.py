@@ -104,22 +104,23 @@ class LeetCodeScraper(BaseScraper):
             if ac.span['class'] != ['ac']:
                 continue
             title, path = title_path.a.string, title_path.a['href']
-            ac_dict[path] = [prob_id, title, None]
+            ac_dict[path] = [prob_id.string, title, None]
 
         self.fetch_submit_times_by(ac_dict, get_lastest_problem_id(self.name))
 
         # Refine data
+        # LOGGER.debug('ac_dict: %s', sorted(ac_dict.items(), key=lambda x: x.))
         return [
             Submission(self.name,
-                       prob_id.string,
+                       prob_id,
                        title,
                        self.session(path),
                        # TODO possible get tz of user submission?
                        self.cal.parseDT(self.normalize_time(ago.string), tzinfo=pytz.utc)[0])
-            for path, (prob_id, title, ago) in ac_dict.items()
+            for path, (prob_id, title, ago) in ac_dict.items() if ago is not None
         ]
 
-    def fetch_submit_times_by(self, ac_dict, latest_id=-1):
+    def fetch_submit_times_by(self, ac_dict, latest_id=None):
         for i in itertools.count(1):
             sub_soup = self.session.soup('/submissions/{}'.format(i))
             rows = sub_soup.select('#result_testcases > tbody > tr')
