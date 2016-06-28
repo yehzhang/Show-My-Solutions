@@ -1,0 +1,13 @@
+{
+    "sources": ["leetcode"],
+    "leetcode": {
+        "username": "my username",
+        "password": "my password"
+    },
+    
+    "handlers": ["trello"],
+    "trello": {
+        "target_board_name": "Example Board",
+        "target_list_name": "Example List"
+    }
+}
