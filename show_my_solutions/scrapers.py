@@ -46,7 +46,7 @@ class BaseScraper(metaclass=ScraperMeta):
         self.login()
 
         self.init()
-        LOGGER.debug("%s '%s' has inited: %s", type(self).name, self.name, self.options)
+        LOGGER.debug("%s '%s' has inited: %s", type(type(self)).name, self.name, self.options)
 
     def init(self):
         """Init configuration here."""
@@ -92,7 +92,6 @@ class LeetCodeScraper(BaseScraper):
         info_incorrect = 'The login and/or password you specified are not correct'
         assert info_incorrect not in r.text, info_incorrect
 
-        del self.options['password']
         return True
 
     def fetch(self):
@@ -109,7 +108,6 @@ class LeetCodeScraper(BaseScraper):
         self.fetch_submit_times_by(ac_dict, get_lastest_problem_id(self.name))
 
         # Refine data
-        # LOGGER.debug('ac_dict: %s', sorted(ac_dict.items(), key=lambda x: x.))
         return [
             Submission(self.name,
                        prob_id,

@@ -8,18 +8,18 @@ LOGGER = logging.getLogger(__name__)
 
 class WebsiteSession(requests.Session):
 
-    def __init__(self, host, auth=None, login=None):
+    def __init__(self, prefix, auth=None, login=None):
         """
-        :param host: protocal and domain to prepend in all requests
+        :param prefix: protocal and domain to prepend in all requests
         :param auth: same as the one in requests.Session
         :param login: called when authentication failed
         """
         super().__init__()
-        self.host = host
+        self.prefix = prefix
         if auth:
             self.auth = auth
         self.headers.update({
-            'Referer': host,
+            'Referer': prefix,
             'User-Agent': '{} {}'.format(title, version),
         })
         self.login = login
@@ -54,4 +54,4 @@ class WebsiteSession(requests.Session):
         return self.get(*args, **kwargs).json()
 
     def prepend_host(self, path):
-        return '/'.join([self.host, path.lstrip('/')])
+        return '/'.join([self.prefix, path.lstrip('/')])

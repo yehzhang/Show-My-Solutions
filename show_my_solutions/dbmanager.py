@@ -33,9 +33,9 @@ class Submission(Mapping, dict):
         :param problem_title: Should be well formatted because it will be directly saved
             in the database.
         :param submit_time:
-            Must be aware.
-            There is a handy method called datetime.strptime.
-            Remember to set its timezone (probably by the location of the host).
+            Must be aware if timezone is not specified.
+        :param timezone:
+            Timezone of submit_time if it is naive. Assume submit_time is of utc timezone.
         :type oj: str
         :type problem_id: str
         :type title: str
@@ -49,12 +49,12 @@ class Submission(Mapping, dict):
         self.problem_title = problem_title
         self.problem_url = problem_url
         if submit_time.tzinfo:
-            assert timezone is None, 'Both aware submit_time and timezone are given'
-            self.timezone = submit_time.tzinfo.zone
+            assert timezone is None, 'Both timezone and aware submit_time are given'
             self.submit_time = submit_time
+            self.timezone = submit_time.tzinfo.zone
         else:
-            assert timezone is not None, 'Datetime is naive'
-            self.submit_time = pytz.timezone(timezone).localize(submit_time)
+            assert timezone is not None, 'submit_time is naive'
+            self.submit_time = pytz.utc.localize(submit_time).astimezone(pytz.timezone(timezone))
             self.timezone = timezone
         self.pid = pid
 
@@ -123,7 +123,9 @@ t_login = Table('login', meta,
 
 def start_database(**kwargs):
     global engine
-    print(kwargs)
+    if engine:
+        raise RuntimeError('Database is already started')
+
     name = kwargs.pop('name', 'sms.db')
     path = kwargs.pop('path', '.')
     url = 'sqlite:///' + os.path.join(path, name)

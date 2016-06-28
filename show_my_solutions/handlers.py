@@ -36,10 +36,11 @@ class BaseHandler(metaclass=HandlerMeta):
 
     def __init__(self, reactor):
         self.reactor = reactor
-        self.options = dict(self.defaults)
-        self.options.update(self.reactor.options.get(self.name, {}))
+        self.options = self.reactor.options.get(self.name, {})
+        dict(self.defaults)
+        self.options.update()
         self.init()
-        LOGGER.debug("%s '%s' has inited: %s", type(self).name, self.name, self.options)
+        LOGGER.debug("%s '%s' has inited: %s", type(type(self)).name, self.name, self.options)
 
     def init(self):
         """Init configuration here."""
@@ -53,20 +54,19 @@ class TrelloHandler(BaseHandler):
 
     name = 'trello'
     defaults = {
-        'app_key': '7a0445134100faef2f5bbbc4437a42e6',
         # Do not display hour and minute because some OJs do not provide that
-        'submit_time_format': '%b %d',
+        'submit_time_format': '%b %d %Z',
         'user_token': None,
         'auth_expiration': '30days',
         'target_board_name': None,
         'target_list_name': None,
     }
+    APP_KEY = '7a0445134100faef2f5bbbc4437a42e6'
     API_URL = 'https://api.trello.com/1'
 
     def init(self):
-        if not all(k in self.options for k in ('target_board_name', 'target_list_name')):
-            raise AssertionError(
-                "'target_board_name' and 'target_list_name' should both be present")
+        assert all(k in self.options for k in ('target_board_name', 'target_list_name')), \
+            "'target_board_name' and 'target_list_name' should both be present"
         self.list_id = None
         self.me_id = None
         self.labels = None
@@ -94,7 +94,9 @@ class TrelloHandler(BaseHandler):
 
                 # TODO check duplications
                 for sub in submissions:
-                    date = sub.submit_time.strftime(self.options['submit_time_format'])
+                    time_format = self.options.get('submit_time_format',
+                                                   self.reactor.options['submit_time_format'])
+                    date = sub.submit_time.strftime(time_format)
                     s.post('/cards', params={
                         'idList': self.list_id,
                         'name': '{}. {}'.format(sub.problem_id, sub.problem_title),

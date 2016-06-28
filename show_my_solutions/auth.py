@@ -22,7 +22,8 @@ class TrelloAuth(AuthBase):
         self.handler = handler
         self.address = (self.ip, self.port)
         self.port += 1
-        self.key, self.token = map(handler.options.get, ('app_key', 'user_token'))
+        self.key = handler.APP_KEY
+        self.token = handler.options['user_token']
         if self.token is None:
             self.token = fetch_user_token(handler.name)
             if self.token is None:
@@ -35,7 +36,7 @@ class TrelloAuth(AuthBase):
     def init_user_token(self):
         self.ask_user_for_token()
         save_user_token(self.handler.name, self.token)
-        
+
     def ask_user_for_token(self):
         LOGGER.info('Please authenticate me in the browser')
         LOGGER.info('Press Ctrl+C to quit in case of frozen')
@@ -75,7 +76,8 @@ class TrelloAuth(AuthBase):
             LOGGER.debug('Stop listening for token')
             func = request.environ.get('werkzeug.server.shutdown')
             if func is None:
-                raise RuntimeError('Cannot stop listening: Flask is not running with the Werkzeug Server')
+                raise RuntimeError(
+                    'Cannot stop listening: Flask is not running with the Werkzeug Server')
             func()
 
         self.token = None
