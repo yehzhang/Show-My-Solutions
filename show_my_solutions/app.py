@@ -16,9 +16,7 @@ class Reactor:
 
     defaults = {
         'app_name': 'Show My Solutions',
-        'engine_params': {},
         'submit_time_format': '%b %d %H:%M %Z',
-        'logging': 'INFO',
         'sources': [],
         'handlers': [],
     }
@@ -27,10 +25,6 @@ class Reactor:
         self.options = dict(self.defaults)
         self.options.update(config)
         self.options['root_dir'] = ROOT_DIR
-
-        level = set_logging_level(self.options['logging'])
-        if level > logging.DEBUG:
-            warnings.simplefilter("ignore")
 
         self.handlers = [build_handler(s, self) for s in self.options['handlers']]
         if not self.handlers:
@@ -73,7 +67,7 @@ def set_logging_level(level):
         level = getattr(logging, level)
         assert isinstance(level, int)
     except (AttributeError, AssertionError):
-        raise Value('Invalid logging level')
+        raise ValueError('Invalid logging level')
     logging.getLogger(name).setLevel(level)
     return level
 
@@ -99,13 +93,15 @@ def get_args():
 
 
 def get_config(config_path=None):
-    config_path = '.' if not config_path else config_path
+    config_path = './config.json' if not config_path else config_path
     try:
         with open(config_path) as fin:
             return json.load(fin)
     except FileNotFoundError:
         config_path = os.path.abspath(config_path)
         raise ValueError('Config file does not exist on the path: {}'.format(config_path))
+    except IsADirectoryError:
+        raise ValueError('Config file is a directory')
     except json.JSONDecodeError as e:
         raise ValueError('Invalid config file: {}'.format(e))
 
@@ -127,14 +123,19 @@ def run():
         try:
             config = get_config(args.config)
 
-            engine_params = self.options['engine_params']
+            level = set_logging_level(config.get('logging', 'INFO'))
+            if level > logging.DEBUG:
+                warnings.simplefilter("ignore")
+
+            engine_params = config.get('engine_params', {})
             engine_params.setdefault('path', ROOT_DIR)
             engine_params.setdefault('echo', level <= logging.DEBUG)
             start_database(**engine_params)
 
             Reactor(config).start()
         except Exception as e:
-            LOGGER.error(e)
+            # LOGGER.error(e)
+            LOGGER.exception(e)
             return 1
 
     return 0

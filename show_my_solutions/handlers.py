@@ -36,9 +36,8 @@ class BaseHandler(metaclass=HandlerMeta):
 
     def __init__(self, reactor):
         self.reactor = reactor
-        self.options = self.reactor.options.get(self.name, {})
-        dict(self.defaults)
-        self.options.update()
+        self.options = dict(self.defaults)
+        self.options.update(self.reactor.options.get(self.name, {}))
         self.init()
         LOGGER.debug("%s '%s' has inited: %s", type(type(self)).name, self.name, self.options)
 
@@ -54,6 +53,7 @@ class TrelloHandler(BaseHandler):
 
     name = 'trello'
     defaults = {
+        'app_key': '7a0445134100faef2f5bbbc4437a42e6',
         # Do not display hour and minute because some OJs do not provide that
         'submit_time_format': '%b %d %Z',
         'user_token': None,
@@ -61,7 +61,6 @@ class TrelloHandler(BaseHandler):
         'target_board_name': None,
         'target_list_name': None,
     }
-    APP_KEY = '7a0445134100faef2f5bbbc4437a42e6'
     API_URL = 'https://api.trello.com/1'
 
     def init(self):

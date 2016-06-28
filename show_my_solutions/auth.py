@@ -22,7 +22,7 @@ class TrelloAuth(AuthBase):
         self.handler = handler
         self.address = (self.ip, self.port)
         self.port += 1
-        self.key = handler.APP_KEY
+        self.key = handler.options['app_key']
         self.token = handler.options['user_token']
         if self.token is None:
             self.token = fetch_user_token(handler.name)
