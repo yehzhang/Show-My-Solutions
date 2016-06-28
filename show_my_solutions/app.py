@@ -1,14 +1,15 @@
 import logging
-import logging.handlers
 import argparse
 import json
-import os
+import os.path
 from datetime import datetime
-from .dbmanager import start_database, record_submissions, fetch_submissions
+import warnings
+from .dbmanager import start_database, record_submissions, fetch_submissions, _reset_tables
 from .handlers import build_handler
 from .scrapers import build_scraper
 
 LOGGER = logging.getLogger(__name__)
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 
 class Reactor:
@@ -17,7 +18,6 @@ class Reactor:
         'app_name': 'Show My Solutions',
         'engine_params': {},
         'submit_time_format': '%b %d %H:%M %Z',
-        'path': '..',
         'logging': 'INFO',
         'sources': [],
         'handlers': [],
@@ -26,91 +26,115 @@ class Reactor:
     def __init__(self, config):
         self.options = dict(self.defaults)
         self.options.update(config)
+        self.options['root_dir'] = ROOT_DIR
 
-        path = os.path.abspath(self.options['path'])
-        level = config_logging(path, self.options['logging'])
-        engine_params = self.options['engine_params']
-        engine_params.setdefault('path', path)
-        engine_params.setdefault('echo', level == logging.DEBUG)
-        start_database(**engine_params)
+        level = set_logging_level(self.options['logging'])
+        if level > logging.DEBUG:
+            warnings.simplefilter("ignore")
 
         self.handlers = [build_handler(s, self) for s in self.options['handlers']]
+        if not self.handlers:
+            LOGGER.warning('No handler found')
         self.sources = [build_scraper(s, self) for s in self.options['sources']]
+        if not self.sources:
+            LOGGER.warning('No source found')
 
-        LOGGER.debug('Loaded with configuration: %s', json.dumps(self.options, indent=2))
+        LOGGER.debug('Loaded configuration: %s', json.dumps(self.options, indent=2))
 
     def start(self):
-        for s in self.sources:
-            subs = s.fetch()
-            LOGGER.debug('Fetched submissions: %s', subs)
-            LOGGER.info('Fetched %s submission(s) from %s', len(subs), s.name)
-            record_submissions(subs)
-        LOGGER.info('All submissions are fetched')
+        LOGGER.info('Reactor started')
+        try:
+            for s in self.sources:
+                subs = s.fetch()
+                LOGGER.debug('Fetched submissions: %s', subs)
+                LOGGER.info('Fetched %s submission(s) from %s', len(subs), s.name)
+                record_submissions(subs)
+            LOGGER.info('All submissions are fetched')
 
-        for h in self.handlers:
-            subs = fetch_submissions(h.name)
-            if subs:
-                LOGGER.debug('Uploading submissions: %s', subs)
-                h.upload(subs)
-                LOGGER.info('Uploaded %s submission(s) to %s', len(subs), h.name)
-        LOGGER.info('All submissions are uploaded')
+            for h in self.handlers:
+                subs = fetch_submissions(h.name)
+                if subs:
+                    LOGGER.debug('Uploading submissions: %s', subs)
+                    h.upload(subs)
+                    LOGGER.info('Uploaded %s submission(s) to %s', len(subs), h.name)
+            LOGGER.info('All submissions are uploaded')
+
+        except KeyboardInterrupt:
+            pass
+
+        finally:
+            LOGGER.info('Reactor stopped')
 
 
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--config', metavar='path', required=False,
-                        default=None, help='Path to the config file.')
-    return parser.parse_args()
-
-
-def config_logging(path, level):
+def set_logging_level(level):
     from . import __name__ as name
-
-    def set_handler(hdlr):
-        hdlr.setLevel(level)
-        hdlr.setFormatter(fmt)
-        logger.addHandler(hdlr)
 
     try:
         level = getattr(logging, level)
         assert isinstance(level, int)
     except (AttributeError, AssertionError):
         raise Value('Invalid logging level')
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-
-    now = datetime.now()
-    log_path = os.path.join(path, now.strftime('%b_%d'))
-    os.makedirs(log_path, exist_ok=True)
-    filename = os.path.join(log_path, '{}_{}.log'.format(now.strftime('%d-%m-%y-%H00'), name))
-    fmt = logging.Formatter('%(asctime)s %(levelname)s - %(message)s', '%m-%d %H:%M')
-    set_handler(logging.handlers.RotatingFileHandler(filename, maxBytes=10 * 2**20, backupCount=5))
-    set_handler(logging.StreamHandler())
-
+    logging.getLogger(name).setLevel(level)
     return level
 
 
-def get_config(config_path=None):
-    if config_path is None:
-        config_path = './example_configs/config.json'
-        path = '.'
-    else:
-        path, _ = os.path.split(config_path)
+def setup_logging():
+    from . import __name__ as name
 
+    logger = logging.getLogger(name)
+    hdlr = logging.StreamHandler()
+    fmt = logging.Formatter('%(asctime)s %(levelname)s - %(message)s', '%m-%d %H:%M')
+    hdlr.setFormatter(fmt)
+    logger.addHandler(hdlr)
+    logger.setLevel(logging.INFO)
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--config', metavar='path', required=False, default=None,
+                        help='Path to the config file.')
+    parser.add_argument('-r', '--reset', required=False, action='store_true', default=False,
+                        help='Reset the internal database')
+    return parser.parse_args()
+
+
+def get_config(config_path=None):
+    config_path = '.' if not config_path else config_path
     try:
         with open(config_path) as fin:
-            config = json.load(fin)
+            return json.load(fin)
     except FileNotFoundError:
-        raise ValueError('Config file does not exist')
-
-    config['path'] = path
-
-    return config
+        config_path = os.path.abspath(config_path)
+        raise ValueError('Config file does not exist on the path: {}'.format(config_path))
+    except json.JSONDecodeError as e:
+        raise ValueError('Invalid config file: {}'.format(e))
 
 
 def run():
     args = get_args()
-    config = get_config(args.config)
+    setup_logging()
 
-    Reactor(config).start()
+    if args.reset:
+        if input('Reset the internal database? [y/n]: ').startswith('y'):
+            start_database(path=ROOT_DIR)
+            _reset_tables()
+            msg = 'Database has been reset'
+        else:
+            msg = 'Aborted reset'
+        LOGGER.info(msg)
 
+    else:
+        try:
+            config = get_config(args.config)
+
+            engine_params = self.options['engine_params']
+            engine_params.setdefault('path', ROOT_DIR)
+            engine_params.setdefault('echo', level <= logging.DEBUG)
+            start_database(**engine_params)
+
+            Reactor(config).start()
+        except Exception as e:
+            LOGGER.error(e)
+            return 1
+
+    return 0
