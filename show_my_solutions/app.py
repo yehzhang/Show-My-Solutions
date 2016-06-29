@@ -38,20 +38,26 @@ class Reactor:
     def start(self):
         LOGGER.info('Reactor started')
         try:
+            num_subs = 0
             for s in self.sources:
                 subs = s.fetch()
                 LOGGER.debug('Fetched submissions: %s', subs)
-                LOGGER.info('Fetched %s submission(s) from %s', len(subs), s.name)
+                LOGGER.info("Fetched %s submission(s) from '%s'", len(subs), s.name)
                 record_submissions(subs)
-            LOGGER.info('All submissions are fetched')
+                num_subs += len(subs)
+            LOGGER.info('Fetched %s submission(s) in total', num_subs)
 
+            num_ups = 0
             for h in self.handlers:
-                subs = fetch_submissions(h.name)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    subs = fetch_submissions(h.name)
                 if subs:
-                    LOGGER.debug('Uploading submissions: %s', subs)
+                    LOGGER.debug('Handling submissions: %s', subs)
                     h.upload(subs)
-                    LOGGER.info('Uploaded %s submission(s) to %s', len(subs), h.name)
-            LOGGER.info('All submissions are uploaded')
+                    LOGGER.info("Handled %s submission(s) by '%s'", len(subs), h.name)
+                    num_ups += len(subs)
+            LOGGER.info('Handled %s submission(s) in total', num_ups)
 
         except KeyboardInterrupt:
             pass
@@ -110,22 +116,19 @@ def run():
     args = get_args()
     setup_logging()
 
-    if args.reset:
-        if input('Reset the internal database? [y/n]: ').startswith('y'):
-            start_database(path=ROOT_DIR)
-            _reset_tables()
-            msg = 'Database has been reset'
-        else:
-            msg = 'Aborted reset'
-        LOGGER.info(msg)
+    try:
+        if args.reset:
+            if input('Reset the internal database? [y/n]: ').startswith('y'):
+                start_database(path=ROOT_DIR)
+                _reset_tables()
+                LOGGER.info('Database has been reset')
+            else:
+                LOGGER.info('Reset aborted')
 
-    else:
-        try:
+        else:
             config = get_config(args.config)
 
             level = set_logging_level(config.get('logging', 'INFO'))
-            if level > logging.DEBUG:
-                warnings.simplefilter("ignore")
 
             engine_params = config.get('engine_params', {})
             engine_params.setdefault('path', ROOT_DIR)
@@ -133,9 +136,8 @@ def run():
             start_database(**engine_params)
 
             Reactor(config).start()
-        except Exception as e:
-            # LOGGER.error(e)
-            LOGGER.exception(e)
-            return 1
+    except Exception as e:
+        LOGGER.exception(e)
+        return 1
 
     return 0

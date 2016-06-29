@@ -23,6 +23,7 @@ class WebsiteSession(requests.Session):
             'User-Agent': '{} {}'.format(title, version),
         })
         self.login = login
+        self.last_url = None
 
     def __del__(self):
         self.close()
@@ -33,6 +34,7 @@ class WebsiteSession(requests.Session):
     def request(self, method, url, *args, **kwargs):
         url = self.prepend_host(url)
         r = super().request(method, url, *args, **kwargs)
+        self.last_url = r.url
 
         LOGGER.debug('Query url: %s with method %s, recieving status code %s',
                      r.url, method, r.status_code)

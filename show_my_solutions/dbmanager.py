@@ -131,6 +131,7 @@ def start_database(**kwargs):
     url = 'sqlite:///' + os.path.join(path, name)
     engine = create_engine(url, **kwargs)
     meta.create_all(engine)
+    return url
 
 
 def _reset_tables():
@@ -146,12 +147,11 @@ def record_submissions(subs):
     If multiple 'problem_id's exist, only the one with earliest 'submit_time'
         will be recorded.
     """
-    # Remove tzinfo. Some databases do not support timezone in datetime
+    # Remove tzinfo. Some databases do not support timezone info in datetime
     new_subs = []
     for sub in subs:
         sub = sub.clone()
-        sub.submit_time = sub.submit_time.astimezone(tz=pytz.utc)
-        sub.submit_time = sub.submit_time.replace(tzinfo=None)
+        sub.submit_time = sub.submit_time.astimezone(pytz.utc).replace(tzinfo=None)
         new_subs.append(sub)
 
     # Let records be a bit more ordered
