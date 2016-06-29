@@ -49,6 +49,7 @@ pip install -r requirements.txt
 - Flask
 - parsedatetime
 - pytz
+- tzlocal
 - requests
 - beautifulsoup4
 
