@@ -16,7 +16,9 @@ class Reactor:
 
     defaults = {
         'app_name': 'Show My Solutions',
-        'submit_time_format': '%b %d %H:%M %Z',
+        # Do not display hour and minute because some OJs do not provide that
+        # 'submit_time_format': '%b %d %H:%M %Z',
+        'submit_time_format': '%b %d %Z',
         'sources': [],
         'handlers': [],
     }

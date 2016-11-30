@@ -39,10 +39,10 @@ class WebsiteSession(requests.Session):
         LOGGER.debug('Query url: %s with method %s, recieving status code %s',
                      r.url, method, r.status_code)
         if r.status_code == 401:
-            if not kwargs.get('retry', False) and self.login:
+            if not kwargs.get('is_retry') and self.login:
                 if self.login():
-                    return self.request(method, url, *args, **kwargs, retry=True)
-            raise RuntimeError('Cannot authenticate')
+                    return self.request(method, url, *args, **kwargs, is_retry=True)
+            raise RuntimeError('Cannot authenticate. Please try again')
         if r.status_code >= 400:
             raise RuntimeError('Exception occured: {}'.format(r.text))
 

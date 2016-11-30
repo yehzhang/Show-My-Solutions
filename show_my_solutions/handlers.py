@@ -54,8 +54,6 @@ class TrelloHandler(BaseHandler):
     name = 'trello'
     defaults = {
         'app_key': '7a0445134100faef2f5bbbc4437a42e6',
-        # Do not display hour and minute because some OJs do not provide that
-        'submit_time_format': '%b %d %Z',
         'user_token': None,
         'auth_expiration': '30days',
         'target_board_name': None,

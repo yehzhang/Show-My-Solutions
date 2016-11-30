@@ -1,8 +1,8 @@
 import logging
 from datetime import datetime, timedelta
 import random
-import pytest
 import pytz
+import pytest
 from show_my_solutions.dbmanager import Submission
 
 
@@ -23,7 +23,7 @@ def gen_sub(oj, problem_id, seconddelta=None):
                       problem_id,
                       'Test {}'.format(random.randint(0, MAX_ROW)),
                       '{}.com/test_{}.html'.format(oj.lower(), problem_id),
-                      datetime.now(tz=pytz.utc) + timedelta(seconds=seconddelta))
+                      datetime.now(pytz.utc) + timedelta(seconds=seconddelta))
 
 
 def gen_rand_subs(n=MAX_ROW, sort=False):
@@ -119,6 +119,7 @@ def reactor():
     return Reactor(get_config())
 
 
+@pytest.mark.skip
 def test_trello_handler(reactor):
     from show_my_solutions.handlers import build_handler
 
@@ -126,6 +127,7 @@ def test_trello_handler(reactor):
     handler.upload(gen_rand_subs(10, True))
 
 
+@pytest.mark.skip
 def test_leetcode_scraper(reactor):
     from show_my_solutions.scrapers import build_scraper
     from bs4 import BeautifulSoup

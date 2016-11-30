@@ -139,8 +139,10 @@ class LeetCodeScraper(BaseScraper):
     def fetch_submit_times_by(self, ac_dict, latest_id=None):
         for i in itertools.count(1):
             sub_soup = self.session.soup('/submissions/{}'.format(i))
-            rows = sub_soup.select('#result_testcases > tbody > tr')
+            rows = sub_soup.select('#result-testcases > tbody > tr')
             if not rows:
+                if i == 1:
+                    LOGGER.warning('Not found any submissions at all')
                 break
             for row in rows:
                 ago, title_path, status, _, _ = row('td')
