@@ -71,7 +71,7 @@ Change directory, build a config.json here or specify a config file with `--conf
     "logging": "DEBUG",
     
     // (optional) Sources to get submissions
-    "sources": ["leetcode"],
+    "sources": ["leetcode", "poj"],
 
     // (optional) Source-specific options
     "leetcode": {
@@ -81,7 +81,10 @@ Change directory, build a config.json here or specify a config file with `--conf
         // (required)
         "password": "my password"
     },
-
+    "poj": {
+        // (required) User_id of your POJ account
+        "username": "my username"
+    },
 
     // (optional) Handlers to handle submissions
     "handlers": ["trello"],
@@ -102,7 +105,6 @@ Change directory, build a config.json here or specify a config file with `--conf
     },
 
     // (optinal) datetime.strftime() format of submit time for displaying
-    // May not be followed when precise time is unavailable
     "submit_time_format": "%b %d %H:%M %Z"
 }
 ```
